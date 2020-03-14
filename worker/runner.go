@@ -10,49 +10,47 @@ import (
 	"time"
 )
 
-func runTarget() (*Result, error) {
+func runTarget(input, expectedOutput []string) (*Result, error) {
 	res := &Result{}
 	res.apiResponse.StartTime = time.Now().Unix()
 
-	grepCmd := exec.Command("target.exe")
+	cmd := exec.Command("target.exe")
 
-	grepIn, err := grepCmd.StdinPipe()
+	cmdStdin, err := cmd.StdinPipe()
 	if err != nil {
-		return nil, fmt.Errorf("error piping stdin from cmd: %w", err)
+		return res, fmt.Errorf("error piping stdin from cmd: %w", err)
 	}
 
 	var output bytes.Buffer
-	grepCmd.Stderr = os.Stderr
-	grepCmd.Stdout = &output
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = &output
 
-	if err := grepCmd.Start(); err != nil {
-		return nil, fmt.Errorf("error starting command: %w", err)
+	if err := cmd.Start(); err != nil {
+		return res, fmt.Errorf("error starting command: %w", err)
 	}
 
-	for _, line := range lines {
-		if _, err := grepIn.Write([]byte(line + "\r\n\n")); err != nil {
-			return nil, fmt.Errorf("error writing %q to cmd: %w", line, err)
+	for _, line := range input {
+		if _, err := cmdStdin.Write([]byte(line + "\r\n\n")); err != nil {
+			return res, fmt.Errorf("error writing %q to cmd: %w", line, err)
 		}
 	}
 
-	if err := grepIn.Close(); err != nil {
-		return nil, fmt.Errorf("error closing cmd stdin pipe: %w", err)
+	if err := cmdStdin.Close(); err != nil {
+		return res, fmt.Errorf("error closing cmd stdin pipe: %w", err)
 	}
 
-	if err := grepCmd.Wait(); err != nil {
-		return nil, fmt.Errorf("error waiting for cmd: %w", err)
+	if err := cmd.Wait(); err != nil {
+		return res, fmt.Errorf("error waiting for cmd: %w", err)
 	}
 
 	scan := bufio.NewScanner(&output)
-	i := 0
-	for scan.Scan() {
+	for i := 0; scan.Scan(); i++ {
 		str := scan.Text()
-		if str != expected[i] {
-			res.apiResponse.Errors = append(res.apiResponse.Errors, fmt.Sprintf("line %d: expected %q but received %q!", i, expected[i], str))
-			log.Printf("output mismatch, expected %q and received %q", expected[i], str)
+		if str != expectedOutput[i] {
+			res.apiResponse.Errors = append(res.apiResponse.Errors, fmt.Sprintf("line %d: expected %q but received %q!", i, expectedOutput[i], str))
+			log.Printf("output mismatch, expected %q and received %q", expectedOutput[i], str)
 		}
 		res.apiResponse.Log = append(res.apiResponse.Log, str)
-		i++
 	}
 
 	res.apiResponse.EndTime = time.Now().Unix()

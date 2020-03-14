@@ -18,3 +18,5 @@ out
 
 .idea
 cppsrc
+.env
+certs

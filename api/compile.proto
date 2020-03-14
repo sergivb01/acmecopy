@@ -7,6 +7,8 @@ package api;
 
 message CompileRequest {
     repeated File files = 1;
+    repeated string input = 2;
+    repeated string expected_output = 3;
 }
 
 message File {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os/exec"
 	"path/filepath"
@@ -39,7 +38,7 @@ func (r *Result) listenForChannels() {
 		log.Printf("error compiling file: %s", err)
 		break
 	case buildOut := <-r.outChan:
-		if len(strings.TrimSpace(buildOut)) != 0 {
+		if strings.TrimSpace(buildOut) != "" {
 			r.m.Lock()
 			r.apiResponse.Log = append(r.apiResponse.Log, buildOut)
 			r.m.Unlock()
@@ -55,6 +54,7 @@ func compileFiles(files []*api.File) (*Result, error) {
 		outChan: make(chan string),
 		m:       &sync.Mutex{},
 	}
+
 	res.apiResponse.StartTime = time.Now().Unix()
 
 	var fileNames []string
@@ -63,7 +63,6 @@ func compileFiles(files []*api.File) (*Result, error) {
 			fileNames = append(fileNames, file.FileName)
 		}
 	}
-	fmt.Println("files: ", fileNames)
 
 	var args = []string{"-std=c++11"}
 
@@ -90,6 +89,7 @@ func compileFiles(files []*api.File) (*Result, error) {
 		res.apiResponse.Errors = append(res.apiResponse.Errors, err.Error())
 	}
 	res.apiResponse.Log = append(res.apiResponse.Log, string(b))
+	log.Printf("received from final build: %q\n", string(b))
 
 	res.apiResponse.EndTime = time.Now().Unix()
 	res.apiResponse.Took = res.apiResponse.EndTime - res.apiResponse.StartTime
