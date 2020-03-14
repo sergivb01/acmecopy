@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+// TODO: use timestamp
+//import "google/protobuf/timestamp.proto";
+
+package api;
+
+message CompileRequest {
+    repeated File files = 1;
+}
+
+message File {
+    string fileName = 1;
+    bytes content = 2;
+}
+
+message CompileResponse {
+    Response build = 1;
+    Response execute = 2;
+}
+
+message Response {
+    repeated string log = 1;
+    repeated string errors = 2;
+    int64 startTime = 3;
+    int64 endTime = 4;
+    int64 took = 5;
+}
+
+service Compiler {
+    rpc CompileFiles (CompileRequest) returns (CompileResponse) {
+    }
+}
