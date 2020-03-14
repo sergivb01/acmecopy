@@ -15,7 +15,7 @@ func (s *Server) createGRPCClient() error {
 		return fmt.Errorf("cannot read credentials from TLS file: %w", err)
 	}
 
-	s.clientConn, err = grpc.Dial("localhost:8080", grpc.WithTransportCredentials(creds))
+	s.clientConn, err = grpc.Dial("localhost:3000", grpc.WithTransportCredentials(creds))
 	if err != nil {
 		return fmt.Errorf("cannot dial to GRPC server: %w", err)
 	}

@@ -11,6 +11,8 @@ type Config struct {
 	Listen      string
 	PostgresURI string
 	Production  bool
+	TLSCert     string
+	TLSKey      string
 }
 
 func loadConfig() (*Config, error) {
@@ -21,6 +23,8 @@ func loadConfig() (*Config, error) {
 		Listen:      getEnv("LISTEN_ADDR", "localhost:8080"),
 		PostgresURI: getEnv("POSTGRES_URI", "postgresql://postgres:sergivb01@127.0.0.1/postgres?sslmode=disable"),
 		Production:  getEnv("PRODUCTION", "false") == "true",
+		TLSCert:     getEnv("TLS_CERT", "C:\\Users\\Sergi\\Desktop\\acmecopy\\certs\\certificate.pem"),
+		TLSKey:      getEnv("TLS_KEY", "C:\\Users\\Sergi\\Desktop\\acmecopy\\certs\\key.pem"),
 	}, nil
 }
 

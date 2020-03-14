@@ -6,6 +6,8 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 
 	jsoniter "github.com/json-iterator/go"
@@ -28,27 +30,33 @@ func (s *Server) handleHealthz() http.HandlerFunc {
 
 // TODO: implement channels for errors
 func (s *Server) readFiles(r *http.Request) []*api.File {
-	var files []*api.File
-	var wg sync.WaitGroup
-	var m sync.Mutex
+	var (
+		files []*api.File
+		wg    sync.WaitGroup
+		m     sync.Mutex
+	)
+
 	for _, h := range r.MultipartForm.File["files"] {
 		go func(h *multipart.FileHeader) {
+			_, name := filepath.Split(h.Filename)
+
 			var buff bytes.Buffer
 			file, err := h.Open()
 			if err != nil {
-				s.log.Error("error copying to file", zap.String("fileName", h.Filename), zap.Error(err))
+				s.log.Error("error copying to file", zap.String("fileName", name), zap.Error(err))
 			}
 
 			if _, err := io.Copy(&buff, file); err != nil {
-				s.log.Error("error copying to file", zap.String("fileName", h.Filename), zap.Error(err))
+				s.log.Error("error copying to file", zap.String("fileName", name), zap.Error(err))
 			}
 
 			m.Lock()
 			files = append(files, &api.File{
-				FileName: h.Filename,
+				FileName: name,
 				Content:  buff.Bytes(),
 			})
 			m.Unlock()
+			wg.Done()
 		}(h)
 		wg.Add(1)
 	}
@@ -88,4 +96,10 @@ func (s *Server) handleSubmit() http.HandlerFunc {
 			s.log.Error("error encoding to json", zap.Error(err))
 		}
 	}
+}
+func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
+	pwd, _ := os.Getwd()
+	pth := filepath.Join(pwd, "index.html")
+	http.ServeFile(w, r, pth)
+	s.log.Info("should be showing index", zap.String("path", pth))
 }

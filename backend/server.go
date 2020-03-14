@@ -2,14 +2,17 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/jmoiron/sqlx"
+
+	// "github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
@@ -19,13 +22,15 @@ import (
 	"github.com/sergivb01/acmecopy/api"
 )
 
+import _ "net/http/pprof"
+
 type Server struct {
 	router *mux.Router
 
 	clientConn *grpc.ClientConn
 	cli        api.CompilerClient
 
-	db  *sqlx.DB
+	// db  *sqlx.DB
 	log *zap.Logger
 	cfg Config
 
@@ -38,10 +43,10 @@ func NewServer() (*Server, error) {
 		return nil, fmt.Errorf("could not load config: %w", err)
 	}
 
-	db, err := sqlx.Open("postgres", c.PostgresURI)
-	if err != nil {
-		return nil, fmt.Errorf("could not connect to database: %w", err)
-	}
+	// db, err := sqlx.Open("postgres", c.PostgresURI)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("could not connect to database: %w", err)
+	// }
 
 	logConfig := zap.NewDevelopmentConfig()
 	if c.Production {
@@ -56,8 +61,8 @@ func NewServer() (*Server, error) {
 	}
 
 	return &Server{
-		cfg:     *c,
-		db:      db,
+		cfg: *c,
+		// db:      db,
 		log:     logger,
 		healthy: atomic.NewBool(false),
 	}, nil
@@ -66,6 +71,7 @@ func NewServer() (*Server, error) {
 func (s *Server) routes() {
 	router := mux.NewRouter()
 
+	router.HandleFunc("/test", s.handleIndex).Methods("GET")
 	router.HandleFunc("/api/health", s.handleHealthz()).Methods("GET")
 	router.HandleFunc("/api/submit", s.handleSubmit()).Methods("POST")
 
@@ -99,23 +105,33 @@ func (s *Server) Listen() {
 		return
 	}
 
+	if !s.cfg.Production {
+		go registerDebugServer()
+		s.log.Debug("registered pprof http server", zap.String("address", ":8083"))
+	}
+
 	srv := &http.Server{
-		Addr:         ":8081",
+		Addr:         s.cfg.Listen,
 		ReadTimeout:  time.Second * 5,
 		WriteTimeout: time.Second * 10,
 		IdleTimeout:  time.Second * 15,
 		Handler:      s.loggerMiddleware(s.router),
+		TLSConfig: &tls.Config{
+			NextProtos: []string{"h2"},
+		},
 	}
 
 	// Run our server in a goroutine so that it doesn't block
 	go func() {
 		// Should initialize Atomic Health, but is being done in NewServer
-		s.log.Info("started listening HTTP server", zap.String("address", ":8081"))
-		if err := srv.ListenAndServe(); err != nil {
+		s.log.Info("started listening HTTP server", zap.String("address", s.cfg.Listen))
+		s.healthy.Store(true)
+
+		if err := srv.ListenAndServeTLS(s.cfg.TLSCert, s.cfg.TLSKey); err != nil {
 			s.log.Fatal("failed to start server", zap.Error(err))
+			s.healthy.Store(false)
 			return
 		}
-		s.healthy.Store(true)
 	}()
 
 	c := make(chan os.Signal, 1)
@@ -127,9 +143,9 @@ func (s *Server) Listen() {
 	<-c
 
 	s.log.Info("closing HTTP server and database pool")
-	if err := s.db.Close(); err != nil {
-		s.log.Fatal("failed to close database connection", zap.Error(err))
-	}
+	// if err := s.db.Close(); err != nil {
+	// 	s.log.Fatal("failed to close database connection", zap.Error(err))
+	// }
 
 	// Create a deadline to wait for
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -146,4 +162,13 @@ func (s *Server) Listen() {
 	if err := srv.Shutdown(ctx); err != nil {
 		s.log.Fatal("failed to shut down server gracefully", zap.Error(err))
 	}
+}
+
+func registerDebugServer() {
+	server := &http.Server{
+		Addr:         ":8888",
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+	}
+	log.Fatal(server.ListenAndServe())
 }

@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"io/ioutil"
-	"log"
 	"os"
+	"path/filepath"
 
 	"google.golang.org/grpc"
 
@@ -16,26 +16,27 @@ type compileServer struct {
 }
 
 func (c *compileServer) CompileFiles(_ context.Context, req *api.CompileRequest) (*api.CompileResponse, error) {
-	for _, compileFile := range req.Files {
-		if err := ioutil.WriteFile(compileFile.FileName, compileFile.Content, 744); err != nil {
+	pwd, _ := os.Getwd()
+	tempDir, err := ioutil.TempDir(pwd, "*")
+	if err != nil {
+		return &api.CompileResponse{}, err
+	}
+	defer os.RemoveAll(tempDir)
+
+	for _, file := range req.Files {
+		if err := ioutil.WriteFile(filepath.Join(tempDir, file.FileName), file.Content, 744); err != nil {
 			return &api.CompileResponse{}, err
 		}
 	}
-	defer func() {
-		pwd, _ := os.Getwd()
-		if err := os.RemoveAll(pwd); err != nil {
-			log.Printf("error cleaning up %s files: %v\n", pwd, err)
-		}
-	}()
 
 	var res api.CompileResponse
-	buildRes, err := compileFiles(req.Files)
+	buildRes, err := compileFiles(tempDir, req.Files)
 	if err != nil {
 		return &res, err
 	}
 	res.Build = &buildRes.apiResponse
 
-	execRes, err := runTarget(req.Input, req.ExpectedOutput)
+	execRes, err := runTarget(tempDir, req.Input, req.ExpectedOutput)
 	res.Execute = &execRes.apiResponse
 
 	return &res, err

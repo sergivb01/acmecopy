@@ -18,5 +18,5 @@ out
 
 .idea
 cppsrc
-.env
+cppsrc/out/.env
 certs

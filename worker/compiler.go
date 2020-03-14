@@ -23,8 +23,8 @@ type Result struct {
 	m           *sync.Mutex
 }
 
-func compileSingleFile(file string, wg *sync.WaitGroup) ([]byte, error) {
-	cmd := exec.Command("g++", "-c", file)
+func compileSingleFile(pwd, file string, wg *sync.WaitGroup) ([]byte, error) {
+	cmd := exec.Command("g++", "-c", filepath.Join(pwd, file), "-o", filepath.Join(pwd, file[0:len(file)-len(filepath.Ext(file))]+".o"))
 	defer wg.Done()
 	return cmd.CombinedOutput()
 }
@@ -48,7 +48,8 @@ func (r *Result) listenForChannels() {
 	}
 }
 
-func compileFiles(files []*api.File) (*Result, error) {
+func compileFiles(pwd string, files []*api.File) (*Result, error) {
+	log.Printf("going to build to %q, files are %+v\n", pwd, files)
 	res := &Result{
 		errChan: make(chan error),
 		outChan: make(chan string),
@@ -73,18 +74,18 @@ func compileFiles(files []*api.File) (*Result, error) {
 
 	for _, file := range fileNames {
 		go func(file string) {
-			b, err := compileSingleFile(file, &wg)
+			b, err := compileSingleFile(pwd, file, &wg)
 			if err != nil {
 				res.errChan <- err
 				return
 			}
 			res.outChan <- string(b)
 		}(file)
-		args = append(args, file[0:len(file)-len(filepath.Ext(file))]+".o")
+		args = append(args, filepath.Join(pwd, file[0:len(file)-len(filepath.Ext(file))]+".o"))
 	}
 	wg.Wait()
 
-	b, err := exec.Command("g++", append(args, "-o", "target.exe")...).CombinedOutput()
+	b, err := exec.Command("g++", append(args, "-o", filepath.Join(pwd, "target.exe"))...).CombinedOutput()
 	if err != nil {
 		res.apiResponse.Errors = append(res.apiResponse.Errors, err.Error())
 	}

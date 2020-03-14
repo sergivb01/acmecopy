@@ -7,14 +7,15 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 )
 
-func runTarget(input, expectedOutput []string) (*Result, error) {
+func runTarget(pwd string, input, expectedOutput []string) (*Result, error) {
 	res := &Result{}
 	res.apiResponse.StartTime = time.Now().Unix()
 
-	cmd := exec.Command("target.exe")
+	cmd := exec.Command(filepath.Join(pwd, "target.exe"))
 
 	cmdStdin, err := cmd.StdinPipe()
 	if err != nil {

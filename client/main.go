@@ -28,7 +28,7 @@ func main() {
 		return
 	}
 
-	conn, err := grpc.Dial("localhost:8080", grpc.WithTransportCredentials(creds))
+	conn, err := grpc.Dial("localhost:3000", grpc.WithTransportCredentials(creds))
 	if err != nil {
 		log.Fatalf("error dialing to server: %s", err)
 		return

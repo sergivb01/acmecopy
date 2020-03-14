@@ -20,7 +20,7 @@ func main() {
 	srv := grpc.NewServer(grpc.Creds(creds))
 	api.RegisterCompilerServer(srv, &compileServer{})
 
-	lis, err := net.Listen("tcp", "localhost:8080")
+	lis, err := net.Listen("tcp", "localhost:3000")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
