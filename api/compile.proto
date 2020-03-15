@@ -17,8 +17,9 @@ message File {
 }
 
 message CompileResponse {
-    Response build = 1;
-    Response execute = 2;
+    string id = 1;
+    Response build = 2;
+    Response execute = 3;
 }
 
 message Response {
